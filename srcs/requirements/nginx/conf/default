@@ -1,0 +1,41 @@
+# HTTP 서버 블록: HTTP 요청을 HTTPS로 리다이렉트
+server {
+    listen 80;
+    server_name dong-kim.42.fr www.dong-kim.42.fr;
+    return 301 https://$server_name$request_uri;  # 모든 HTTP 요청을 HTTPS로 영구 리다이렉트
+}
+
+# HTTPS 서버 블록
+server {
+    listen 443 ssl;  # 443 포트에서 SSL/TLS를 사용하여 리스닝
+    server_name dong-kim.42.fr www.dong-kim.42.fr;  # 서버 도메인 이름 설정
+    ssl_protocols  TLSv1.2 TLSv1.3;  # 허용된 SSL/TLS 프로토콜 버전
+    
+    # SSL 인증서 및 키 파일 위치 지정
+    ssl_certificate /etc/ssl/dong-kim.crt;
+    ssl_certificate_key /etc/ssl/dong-kim.key;
+    
+    root /var/www;  # 웹 사이트 루트 디렉토리
+    index index.php index.html index.htm;  # 기본 인덱스 파일 순서
+
+    # 기본 위치 블록
+    location / {
+        try_files $uri $uri/ /index.php?$args;  # WordPress permalinks를 위한 설정
+    }
+
+    # PHP 파일 처리를 위한 위치 블록
+    location ~ \.php$ {
+        fastcgi_split_path_info ^(.+\.php)(/.+)$;
+        fastcgi_pass wordpress:9000;  # PHP-FPM 서비스의 주소 (Docker 네트워크에서의 서비스 이름)
+        fastcgi_index index.php;
+        include fastcgi_params;  # FastCGI 파라미터 포함
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param PATH_INFO $fastcgi_path_info;
+    }
+
+    # 정적 파일 처리를 위한 위치 블록
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico)$ {
+        expires max;  # 브라우저 캐싱을 최대화
+        log_not_found off;  # 404 에러 로깅 비활성화
+    }
+}
